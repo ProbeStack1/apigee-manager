@@ -114,4 +114,4 @@ jobs:
             --region=${{ env.REGION }} \
             --format='value(status.url)')
           sleep 10
-          curl -f ${SERVICE_URL}/actuator/health || exit 1
+          curl -f ${SERVICE_URL}/ || exit 1

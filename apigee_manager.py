@@ -23,6 +23,10 @@ app = FastAPI(title="Apigee X Manager API")
 SERVICE_ACCOUNT_FILE = "service-account.json"
 BASE = "https://apigee.googleapis.com/v1"
 
+# ─── WORKLOAD IDENTITY CHECK ─────────────────────────────────────────────────
+import os
+USE_DEFAULT_CREDENTIALS = os.environ.get("USE_DEFAULT_CREDENTIALS", "false").lower() == "true"
+
 # ─── AUTH ────────────────────────────────────────────────────────────────────
 
 _token_cache = {"token": None, "expires_at": 0}
@@ -30,11 +34,18 @@ _token_cache = {"token": None, "expires_at": 0}
 def get_token() -> str:
     if time.time() < _token_cache["expires_at"] - 60:
         return _token_cache["token"]
-    creds = service_account.Credentials.from_service_account_file(
-        SERVICE_ACCOUNT_FILE,
-        scopes=["https://www.googleapis.com/auth/cloud-platform"]
-    )
-    creds.refresh(Request())
+    if USE_DEFAULT_CREDENTIALS:
+        # Cloud Run — uses attached service account automatically
+        import google.auth
+        creds, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+        creds.refresh(Request())
+    else:
+        # Local — uses service-account.json file
+        creds = service_account.Credentials.from_service_account_file(
+            SERVICE_ACCOUNT_FILE,
+            scopes=["https://www.googleapis.com/auth/cloud-platform"]
+        )
+        creds.refresh(Request())
     _token_cache["token"] = creds.token
     _token_cache["expires_at"] = time.time() + 3600
     logger.info("Google OAuth2 token refreshed")

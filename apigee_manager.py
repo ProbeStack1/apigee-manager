@@ -20,7 +20,6 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Apigee X Manager API")
 
-ORG = "financialdataexchange"
 SERVICE_ACCOUNT_FILE = "service-account.json"
 BASE = "https://apigee.googleapis.com/v1"
 
@@ -133,6 +132,12 @@ class AppGroup(BaseModel):
     displayName: Optional[str] = None
     attributes: Optional[List[dict]] = []
 
+# ─── ROOT ────────────────────────────────────────────────────────────────────
+
+@app.get("/")
+async def root():
+    return {"status": "ok", "message": "Apigee X Manager API is running"}
+
 # ─── ROUTERS ─────────────────────────────────────────────────────────────────
 
 ts_router    = APIRouter(prefix="/targetservers", tags=["Target Servers"])
@@ -143,167 +148,193 @@ group_router = APIRouter(prefix="/appgroups",     tags=["App Groups"])
 
 # ─── TARGET SERVERS ──────────────────────────────────────────────────────────
 
-def ts_url(env: str, name: str = ""):
-    base = f"{BASE}/organizations/{ORG}/environments/{env}/targetservers"
+def ts_url(org: str, env: str, name: str = ""):
+    base = f"{BASE}/organizations/{org}/environments/{env}/targetservers"
     return f"{base}/{name}" if name else base
 
 @ts_router.get("/")
-async def list_ts(env: str = Query(...)):
+async def list_ts(org: str = Query(...), env: str = Query(...)):
+    validate(org, "org")
     validate(env, "env")
-    return await apigee_request("GET", ts_url(env), get_token(), payload={})
+    return await apigee_request("GET", ts_url(org, env), get_token(), payload={})
 
 @ts_router.get("/{name}")
-async def get_ts(name: str, env: str = Query(...)):
+async def get_ts(name: str, org: str = Query(...), env: str = Query(...)):
+    validate(org, "org")
     validate(env, "env")
     validate(name, "name")
-    return await apigee_request("GET", ts_url(env, name), get_token(), payload={})
+    return await apigee_request("GET", ts_url(org, env, name), get_token(), payload={})
 
 @ts_router.post("/")
-async def create_ts(ts: TargetServer, env: str = Query(...)):
+async def create_ts(ts: TargetServer, org: str = Query(...), env: str = Query(...)):
+    validate(org, "org")
     validate(env, "env")
-    return await apigee_request("POST", ts_url(env), get_token(), ts.model_dump())
+    return await apigee_request("POST", ts_url(org, env), get_token(), ts.model_dump())
 
 @ts_router.put("/{name}")
-async def update_ts(name: str, ts: TargetServer, env: str = Query(...)):
+async def update_ts(name: str, ts: TargetServer, org: str = Query(...), env: str = Query(...)):
+    validate(org, "org")
     validate(env, "env")
     validate(name, "name")
-    return await apigee_request("PUT", ts_url(env, name), get_token(), ts.model_dump())
+    return await apigee_request("PUT", ts_url(org, env, name), get_token(), ts.model_dump())
 
 @ts_router.delete("/{name}")
-async def delete_ts(name: str, env: str = Query(...)):
+async def delete_ts(name: str, org: str = Query(...), env: str = Query(...)):
+    validate(org, "org")
     validate(env, "env")
     validate(name, "name")
-    return await apigee_delete(ts_url(env, name), get_token(), name)
+    return await apigee_delete(ts_url(org, env, name), get_token(), name)
 
 # ─── DEVELOPERS ──────────────────────────────────────────────────────────────
 
-def dev_url(email: str = ""):
-    base = f"{BASE}/organizations/{ORG}/developers"
+def dev_url(org: str, email: str = ""):
+    base = f"{BASE}/organizations/{org}/developers"
     return f"{base}/{email}" if email else base
 
 @dev_router.get("/")
-async def list_developers():
-    return await apigee_request("GET", dev_url(), get_token(), payload={})
+async def list_developers(org: str = Query(...)):
+    validate(org, "org")
+    return await apigee_request("GET", dev_url(org), get_token(), payload={})
 
 @dev_router.get("/{email}")
-async def get_developer(email: str):
+async def get_developer(email: str, org: str = Query(...)):
+    validate(org, "org")
     validate(email, "email")
-    return await apigee_request("GET", dev_url(email), get_token(), payload={})
+    return await apigee_request("GET", dev_url(org, email), get_token(), payload={})
 
 @dev_router.post("/")
-async def create_developer(dev: Developer):
+async def create_developer(dev: Developer, org: str = Query(...)):
+    validate(org, "org")
     validate(dev.email, "email")
-    return await apigee_request("POST", dev_url(), get_token(), dev.model_dump())
+    return await apigee_request("POST", dev_url(org), get_token(), dev.model_dump())
 
 @dev_router.put("/{email}")
-async def update_developer(email: str, dev: Developer):
+async def update_developer(email: str, dev: Developer, org: str = Query(...)):
+    validate(org, "org")
     validate(email, "email")
-    return await apigee_request("PUT", dev_url(email), get_token(), dev.model_dump())
+    return await apigee_request("PUT", dev_url(org, email), get_token(), dev.model_dump())
 
 @dev_router.delete("/{email}")
-async def delete_developer(email: str):
+async def delete_developer(email: str, org: str = Query(...)):
+    validate(org, "org")
     validate(email, "email")
-    return await apigee_delete(dev_url(email), get_token(), email)
+    return await apigee_delete(dev_url(org, email), get_token(), email)
 
 # ─── APPS ─────────────────────────────────────────────────────────────────────
 
-def app_url(developer_email: str, app_name: str = ""):
-    base = f"{BASE}/organizations/{ORG}/developers/{developer_email}/apps"
+def app_url(org: str, developer_email: str, app_name: str = ""):
+    base = f"{BASE}/organizations/{org}/developers/{developer_email}/apps"
     return f"{base}/{app_name}" if app_name else base
 
-def org_app_url(app_id: str = ""):
-    base = f"{BASE}/organizations/{ORG}/apps"
+def org_app_url(org: str, app_id: str = ""):
+    base = f"{BASE}/organizations/{org}/apps"
     return f"{base}/{app_id}" if app_id else base
 
 @app_router.get("/all")
-async def list_all_apps():
-    return await apigee_request("GET", org_app_url(), get_token(), payload={})
+async def list_all_apps(org: str = Query(...)):
+    validate(org, "org")
+    return await apigee_request("GET", org_app_url(org), get_token(), payload={})
 
 @app_router.get("/")
-async def list_apps(developer_email: str = Query(...)):
+async def list_apps(org: str = Query(...), developer_email: str = Query(...)):
+    validate(org, "org")
     validate(developer_email, "developer_email")
-    return await apigee_request("GET", app_url(developer_email), get_token(), payload={})
+    return await apigee_request("GET", app_url(org, developer_email), get_token(), payload={})
 
 @app_router.get("/{app_name}")
-async def get_app(app_name: str, developer_email: str = Query(...)):
+async def get_app(app_name: str, org: str = Query(...), developer_email: str = Query(...)):
+    validate(org, "org")
     validate(developer_email, "developer_email")
     validate(app_name, "app_name")
-    return await apigee_request("GET", app_url(developer_email, app_name), get_token(), payload={})
+    return await apigee_request("GET", app_url(org, developer_email, app_name), get_token(), payload={})
 
 @app_router.post("/")
-async def create_app(app_data: DeveloperApp, developer_email: str = Query(...)):
+async def create_app(app_data: DeveloperApp, org: str = Query(...), developer_email: str = Query(...)):
+    validate(org, "org")
     validate(developer_email, "developer_email")
-    return await apigee_request("POST", app_url(developer_email), get_token(), app_data.model_dump(exclude_none=True))
+    return await apigee_request("POST", app_url(org, developer_email), get_token(), app_data.model_dump(exclude_none=True))
 
 @app_router.put("/{app_name}")
-async def update_app(app_name: str, app_data: DeveloperApp, developer_email: str = Query(...)):
+async def update_app(app_name: str, app_data: DeveloperApp, org: str = Query(...), developer_email: str = Query(...)):
+    validate(org, "org")
     validate(developer_email, "developer_email")
     validate(app_name, "app_name")
-    return await apigee_request("PUT", app_url(developer_email, app_name), get_token(), app_data.model_dump(exclude_none=True))
+    return await apigee_request("PUT", app_url(org, developer_email, app_name), get_token(), app_data.model_dump(exclude_none=True))
 
 @app_router.delete("/{app_name}")
-async def delete_app(app_name: str, developer_email: str = Query(...)):
+async def delete_app(app_name: str, org: str = Query(...), developer_email: str = Query(...)):
+    validate(org, "org")
     validate(developer_email, "developer_email")
     validate(app_name, "app_name")
-    return await apigee_delete(app_url(developer_email, app_name), get_token(), app_name)
+    return await apigee_delete(app_url(org, developer_email, app_name), get_token(), app_name)
 
 # ─── API PRODUCTS ─────────────────────────────────────────────────────────────
 
-def prod_url(name: str = ""):
-    base = f"{BASE}/organizations/{ORG}/apiproducts"
+def prod_url(org: str, name: str = ""):
+    base = f"{BASE}/organizations/{org}/apiproducts"
     return f"{base}/{name}" if name else base
 
 @prod_router.get("/")
-async def list_products():
-    return await apigee_request("GET", prod_url(), get_token(), payload={})
+async def list_products(org: str = Query(...)):
+    validate(org, "org")
+    return await apigee_request("GET", prod_url(org), get_token(), payload={})
 
 @prod_router.get("/{name}")
-async def get_product(name: str):
+async def get_product(name: str, org: str = Query(...)):
+    validate(org, "org")
     validate(name, "name")
-    return await apigee_request("GET", prod_url(name), get_token(), payload={})
+    return await apigee_request("GET", prod_url(org, name), get_token(), payload={})
 
 @prod_router.post("/")
-async def create_product(product: ApiProduct):
-    return await apigee_request("POST", prod_url(), get_token(), product.model_dump(exclude_none=True))
+async def create_product(product: ApiProduct, org: str = Query(...)):
+    validate(org, "org")
+    return await apigee_request("POST", prod_url(org), get_token(), product.model_dump(exclude_none=True))
 
 @prod_router.put("/{name}")
-async def update_product(name: str, product: ApiProduct):
+async def update_product(name: str, product: ApiProduct, org: str = Query(...)):
+    validate(org, "org")
     validate(name, "name")
-    return await apigee_request("PUT", prod_url(name), get_token(), product.model_dump(exclude_none=True))
+    return await apigee_request("PUT", prod_url(org, name), get_token(), product.model_dump(exclude_none=True))
 
 @prod_router.delete("/{name}")
-async def delete_product(name: str):
+async def delete_product(name: str, org: str = Query(...)):
+    validate(org, "org")
     validate(name, "name")
-    return await apigee_delete(prod_url(name), get_token(), name)
+    return await apigee_delete(prod_url(org, name), get_token(), name)
 
 # ─── APP GROUPS ───────────────────────────────────────────────────────────────
 
-def group_url(name: str = ""):
-    base = f"{BASE}/organizations/{ORG}/appgroups"
+def group_url(org: str, name: str = ""):
+    base = f"{BASE}/organizations/{org}/appgroups"
     return f"{base}/{name}" if name else base
 
 @group_router.get("/")
-async def list_appgroups():
-    return await apigee_request("GET", group_url(), get_token(), payload={})
+async def list_appgroups(org: str = Query(...)):
+    validate(org, "org")
+    return await apigee_request("GET", group_url(org), get_token(), payload={})
 
 @group_router.get("/{name}")
-async def get_appgroup(name: str):
+async def get_appgroup(name: str, org: str = Query(...)):
+    validate(org, "org")
     validate(name, "name")
-    return await apigee_request("GET", group_url(name), get_token(), payload={})
+    return await apigee_request("GET", group_url(org, name), get_token(), payload={})
 
 @group_router.post("/")
-async def create_appgroup(group: AppGroup):
-    return await apigee_request("POST", group_url(), get_token(), group.model_dump(exclude_none=True))
+async def create_appgroup(group: AppGroup, org: str = Query(...)):
+    validate(org, "org")
+    return await apigee_request("POST", group_url(org), get_token(), group.model_dump(exclude_none=True))
 
 @group_router.put("/{name}")
-async def update_appgroup(name: str, group: AppGroup):
+async def update_appgroup(name: str, group: AppGroup, org: str = Query(...)):
+    validate(org, "org")
     validate(name, "name")
-    return await apigee_request("PUT", group_url(name), get_token(), group.model_dump(exclude_none=True))
+    return await apigee_request("PUT", group_url(org, name), get_token(), group.model_dump(exclude_none=True))
 
 @group_router.delete("/{name}")
-async def delete_appgroup(name: str):
+async def delete_appgroup(name: str, org: str = Query(...)):
+    validate(org, "org")
     validate(name, "name")
-    return await apigee_delete(group_url(name), get_token(), name)
+    return await apigee_delete(group_url(org, name), get_token(), name)
 
 # ─── REGISTER ROUTERS ─────────────────────────────────────────────────────────
 

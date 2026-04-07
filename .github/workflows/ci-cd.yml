@@ -93,7 +93,7 @@ jobs:
             --max-instances=10 \
             --timeout=300 \
             --concurrency=80 \
-             --set-env-vars="SPRING_PROFILES_ACTIVE=cloud,SPRING_CLOUD_GCP_PROJECT_ID=${{ env.PROJECT_ID }}" \
+             --set-env-vars="PYTHONUNBUFFERED=1,USE_DEFAULT_CREDENTIALS=true" \
             --quiet
 
       - name: Get Service URL

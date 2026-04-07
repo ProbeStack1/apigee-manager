@@ -1,0 +1,18 @@
+# Secrets - NEVER push to GitHub
+service-account.json
+*.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# Docker
+*.tar
+
+# Project specific
+*.zip
+*.ps1
+Shared flows/
+KVM/

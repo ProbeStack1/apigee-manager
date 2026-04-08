@@ -94,7 +94,7 @@ jobs:
           --timeout=300 \
           --concurrency=80 \
           --service-account=github-actions-deployer@probestack-prod.iam.gserviceaccount.com \
-          --set-env-vars="PYTHONUNBUFFERED=1,USE_DEFAULT_CREDENTIALS=true" \
+          --set-env-vars="PYTHONUNBUFFERED=1" \
           --quiet
 
       - name: Get Service URL

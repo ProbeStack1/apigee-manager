@@ -13,12 +13,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY apigee_manager.py .
 
-# Copy service account key
-COPY service-account.json .
-
-# Set env var so app knows where to find the key
-ENV APIGEE_SA_KEY_PATH=/app/service-account.json
-
 # Expose port
 EXPOSE 8080
 

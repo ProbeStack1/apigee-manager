@@ -4,11 +4,14 @@ import time
 import json
 import logging
 import httpx
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query, APIRouter, UploadFile, File
 from pydantic import BaseModel
 from typing import List, Optional
 from google.oauth2 import service_account
 from google.auth.transport.requests import Request
+
+load_dotenv()
 
 # ─── LOGGING ─────────────────────────────────────────────────────────────────
 
@@ -23,26 +26,35 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="Apigee X Manager API")
 
 BASE = "https://apigee.googleapis.com/v1"
-USE_DEFAULT_CREDENTIALS = os.environ.get("USE_DEFAULT_CREDENTIALS", "false").lower() == "true"
 
 # ─── IN-MEMORY SERVICE ACCOUNT STORE ─────────────────────────────────────────
 
-_sa_info = {"data": None}           # stores uploaded service account JSON
+_sa_info = {"data": None}
 _token_cache = {"token": None, "expires_at": 0}
+
+# Load service account from env variable (Cloud Run) or local file path from .env
+_sa_key_env = os.environ.get("APIGEE_SA_KEY")
+_sa_key_path = os.environ.get("APIGEE_SA_KEY_PATH")
+
+if _sa_key_env:
+    # Cloud Run — load from environment variable JSON content
+    try:
+        _sa_info["data"] = json.loads(_sa_key_env)
+        logger.info("Auto-loaded service account from environment variable")
+    except json.JSONDecodeError:
+        logger.error("Invalid APIGEE_SA_KEY environment variable")
+elif _sa_key_path and os.path.isfile(_sa_key_path):
+    # Local — load from file path in .env
+    with open(_sa_key_path) as _f:
+        _sa_info["data"] = json.load(_f)
+    logger.info("Auto-loaded service account from: %s", _sa_key_path)
 
 # ─── AUTH ────────────────────────────────────────────────────────────────────
 
 def get_token() -> str:
     if time.time() < _token_cache["expires_at"] - 60:
         return _token_cache["token"]
-
-    if USE_DEFAULT_CREDENTIALS:
-        # Cloud Run — uses attached GCP service account automatically
-        import google.auth
-        creds, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
-        creds.refresh(Request())
-    elif _sa_info["data"]:
-        # Use uploaded service account JSON
+    if _sa_info["data"]:
         creds = service_account.Credentials.from_service_account_info(
             _sa_info["data"],
             scopes=["https://www.googleapis.com/auth/cloud-platform"]
@@ -51,9 +63,8 @@ def get_token() -> str:
     else:
         raise HTTPException(
             status_code=401,
-            detail="No service account uploaded. Please POST your service-account.json to /auth/upload first."
+            detail="No service account found. Set APIGEE_SA_KEY or APIGEE_SA_KEY_PATH in .env"
         )
-
     _token_cache["token"] = creds.token
     _token_cache["expires_at"] = time.time() + 3600
     logger.info("Google OAuth2 token refreshed")
@@ -161,8 +172,6 @@ async def root():
 
 @app.post("/auth/upload", tags=["Auth"])
 async def upload_service_account(file: UploadFile = File(...)):
-    if USE_DEFAULT_CREDENTIALS:
-        raise HTTPException(status_code=403, detail="Auth upload not needed on Cloud Run — using default credentials")
     try:
         content = await file.read()
         sa_data = json.loads(content)

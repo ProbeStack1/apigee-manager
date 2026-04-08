@@ -161,6 +161,8 @@ async def root():
 
 @app.post("/auth/upload", tags=["Auth"])
 async def upload_service_account(file: UploadFile = File(...)):
+    if USE_DEFAULT_CREDENTIALS:
+        raise HTTPException(status_code=403, detail="Auth upload not needed on Cloud Run — using default credentials")
     try:
         content = await file.read()
         sa_data = json.loads(content)
@@ -212,12 +214,12 @@ def ts_url(org: str, env: str, name: str = ""):
 @ts_router.get("/")
 async def list_ts(org: str = Query(...), env: str = Query(...)):
     validate(org, "org"); validate(env, "env")
-    return await apigee_request("GET", ts_url(org, env), get_token(), payload={})
+    return await apigee_request("GET", ts_url(org, env), get_token())
 
 @ts_router.get("/{name}")
 async def get_ts(name: str, org: str = Query(...), env: str = Query(...)):
     validate(org, "org"); validate(env, "env"); validate(name, "name")
-    return await apigee_request("GET", ts_url(org, env, name), get_token(), payload={})
+    return await apigee_request("GET", ts_url(org, env, name), get_token())
 
 @ts_router.post("/")
 async def create_ts(ts: TargetServer, org: str = Query(...), env: str = Query(...)):
@@ -243,12 +245,12 @@ def dev_url(org: str, email: str = ""):
 @dev_router.get("/")
 async def list_developers(org: str = Query(...)):
     validate(org, "org")
-    return await apigee_request("GET", dev_url(org), get_token(), payload={})
+    return await apigee_request("GET", dev_url(org), get_token())
 
 @dev_router.get("/{email}")
 async def get_developer(email: str, org: str = Query(...)):
     validate(org, "org"); validate(email, "email")
-    return await apigee_request("GET", dev_url(org, email), get_token(), payload={})
+    return await apigee_request("GET", dev_url(org, email), get_token())
 
 @dev_router.post("/")
 async def create_developer(dev: Developer, org: str = Query(...)):
@@ -278,17 +280,17 @@ def org_app_url(org: str, app_id: str = ""):
 @app_router.get("/all")
 async def list_all_apps(org: str = Query(...)):
     validate(org, "org")
-    return await apigee_request("GET", org_app_url(org), get_token(), payload={})
+    return await apigee_request("GET", org_app_url(org), get_token())
 
 @app_router.get("/")
 async def list_apps(org: str = Query(...), developer_email: str = Query(...)):
     validate(org, "org"); validate(developer_email, "developer_email")
-    return await apigee_request("GET", app_url(org, developer_email), get_token(), payload={})
+    return await apigee_request("GET", app_url(org, developer_email), get_token())
 
 @app_router.get("/{app_name}")
 async def get_app(app_name: str, org: str = Query(...), developer_email: str = Query(...)):
     validate(org, "org"); validate(developer_email, "developer_email"); validate(app_name, "app_name")
-    return await apigee_request("GET", app_url(org, developer_email, app_name), get_token(), payload={})
+    return await apigee_request("GET", app_url(org, developer_email, app_name), get_token())
 
 @app_router.post("/")
 async def create_app(app_data: DeveloperApp, org: str = Query(...), developer_email: str = Query(...)):
@@ -314,12 +316,12 @@ def prod_url(org: str, name: str = ""):
 @prod_router.get("/")
 async def list_products(org: str = Query(...)):
     validate(org, "org")
-    return await apigee_request("GET", prod_url(org), get_token(), payload={})
+    return await apigee_request("GET", prod_url(org), get_token())
 
 @prod_router.get("/{name}")
 async def get_product(name: str, org: str = Query(...)):
     validate(org, "org"); validate(name, "name")
-    return await apigee_request("GET", prod_url(org, name), get_token(), payload={})
+    return await apigee_request("GET", prod_url(org, name), get_token())
 
 @prod_router.post("/")
 async def create_product(product: ApiProduct, org: str = Query(...)):
@@ -345,12 +347,12 @@ def group_url(org: str, name: str = ""):
 @group_router.get("/")
 async def list_appgroups(org: str = Query(...)):
     validate(org, "org")
-    return await apigee_request("GET", group_url(org), get_token(), payload={})
+    return await apigee_request("GET", group_url(org), get_token())
 
 @group_router.get("/{name}")
 async def get_appgroup(name: str, org: str = Query(...)):
     validate(org, "org"); validate(name, "name")
-    return await apigee_request("GET", group_url(org, name), get_token(), payload={})
+    return await apigee_request("GET", group_url(org, name), get_token())
 
 @group_router.post("/")
 async def create_appgroup(group: AppGroup, org: str = Query(...)):

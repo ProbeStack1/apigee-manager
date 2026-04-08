@@ -82,19 +82,20 @@ jobs:
           DEPLOY_SERVICE_NAME=${{ env.SERVICE_NAME }}
 
           gcloud run deploy ${DEPLOY_SERVICE_NAME} \
-            --image=us-central1-docker.pkg.dev/probestack-prod/probestack-prod-apps/${{ env.SERVICE_NAME }}:${{ github.sha }} \
-            --platform=managed \
-            --region=${{ env.REGION }} \
-            --allow-unauthenticated \
-            --port=8080 \
-            --memory=512Mi \
-            --cpu=1 \
-            --min-instances=0 \
-            --max-instances=10 \
-            --timeout=300 \
-            --concurrency=80 \
-             --set-env-vars="PYTHONUNBUFFERED=1,USE_DEFAULT_CREDENTIALS=true" \
-            --quiet
+          --image=us-central1-docker.pkg.dev/probestack-prod/probestack-prod-apps/${{ env.SERVICE_NAME }}:${{ github.sha }} \
+          --platform=managed \
+          --region=${{ env.REGION }} \
+          --allow-unauthenticated \
+          --port=8080 \
+          --memory=512Mi \
+          --cpu=1 \
+          --min-instances=0 \
+          --max-instances=10 \
+          --timeout=300 \
+          --concurrency=80 \
+          --service-account=github-actions-deployer@probestack-prod.iam.gserviceaccount.com \
+          --set-env-vars="PYTHONUNBUFFERED=1,USE_DEFAULT_CREDENTIALS=true" \
+          --quiet
 
       - name: Get Service URL
         run: |

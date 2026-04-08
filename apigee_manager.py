@@ -10,6 +10,10 @@ from pydantic import BaseModel
 from typing import List, Optional
 from google.oauth2 import service_account
 from google.auth.transport.requests import Request
+from google.auth import default
+import time
+import threading
+from pydantic import EmailStr
 
 load_dotenv()
 
@@ -49,30 +53,32 @@ elif _sa_key_path and os.path.isfile(_sa_key_path):
 
 # ─── AUTH ────────────────────────────────────────────────────────────────────
 
+_lock = threading.Lock()
+
 def get_token() -> str:
-    if time.time() < _token_cache["expires_at"] - 60:
-        return _token_cache["token"]
-    if _sa_info["data"]:
-        creds = service_account.Credentials.from_service_account_info(
-            _sa_info["data"],
-            scopes=["https://www.googleapis.com/auth/cloud-platform"]
-        )
-        creds.refresh(Request())
-    else:
-        raise HTTPException(
-            status_code=401,
-            detail="No service account found. Set APIGEE_SA_KEY or APIGEE_SA_KEY_PATH in .env"
-        )
-    _token_cache["token"] = creds.token
-    _token_cache["expires_at"] = time.time() + 3600
-    logger.info("Google OAuth2 token refreshed")
-    return creds.token
-
-def headers(token: str):
-    return {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-
-def auth_only(token: str):
-    return {"Authorization": f"Bearer {token}"}
+    try:
+        with _lock:
+            # Use cached token
+            if _token_cache["token"] and time.time() < _token_cache["expires_at"] - 60:
+                return _token_cache["token"]
+            try:
+                # ✅ Cloud Run / GCP way
+                creds, _ = default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+                logger.info("Using default credentials (Cloud Run)")
+            except Exception:
+                # ✅ Local fallback
+                logger.info("Using service account file (local)")
+                creds = service_account.Credentials.from_service_account_file(
+                    os.getenv("APIGEE_SA_KEY_PATH", "service-account.json"),
+                    scopes=["https://www.googleapis.com/auth/cloud-platform"]
+                )
+            creds.refresh(Request())
+            _token_cache["token"] = creds.token
+            _token_cache["expires_at"] = creds.expiry.timestamp()
+            return creds.token
+    except Exception as e:
+        logger.error(f"Token generation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to generate token")
 
 # ─── INPUT VALIDATION ────────────────────────────────────────────────────────
 

@@ -34,17 +34,15 @@ _token_cache = {"token": None, "expires_at": 0}
 
 # Load service account from env variable (Cloud Run) or local file path from .env
 _sa_key_env = os.environ.get("APIGEE_SA_KEY")
-_sa_key_path = os.environ.get("APIGEE_SA_KEY_PATH")
+_sa_key_path = os.environ.get("APIGEE_SA_KEY_PATH", "service-account.json")
 
 if _sa_key_env:
-    # Cloud Run — load from environment variable JSON content
     try:
         _sa_info["data"] = json.loads(_sa_key_env)
         logger.info("Auto-loaded service account from environment variable")
     except json.JSONDecodeError:
         logger.error("Invalid APIGEE_SA_KEY environment variable")
 elif _sa_key_path and os.path.isfile(_sa_key_path):
-    # Local — load from file path in .env
     with open(_sa_key_path) as _f:
         _sa_info["data"] = json.load(_f)
     logger.info("Auto-loaded service account from: %s", _sa_key_path)

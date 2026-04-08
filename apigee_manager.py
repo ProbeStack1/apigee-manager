@@ -3,17 +3,15 @@ import os
 import time
 import json
 import logging
+import threading
 import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query, APIRouter, UploadFile, File
 from pydantic import BaseModel
 from typing import List, Optional
 from google.oauth2 import service_account
-from google.auth.transport.requests import Request
 from google.auth import default
-import time
-import threading
-from pydantic import EmailStr
+from google.auth.transport.requests import Request
 
 load_dotenv()
 
@@ -35,8 +33,9 @@ BASE = "https://apigee.googleapis.com/v1"
 
 _sa_info = {"data": None}
 _token_cache = {"token": None, "expires_at": 0}
+_lock = threading.Lock()
 
-# Load service account from env variable (Cloud Run) or local file path from .env
+# Load service account from env variable or local file path from .env
 _sa_key_env = os.environ.get("APIGEE_SA_KEY")
 _sa_key_path = os.environ.get("APIGEE_SA_KEY_PATH", "service-account.json")
 
@@ -53,32 +52,32 @@ elif _sa_key_path and os.path.isfile(_sa_key_path):
 
 # ─── AUTH ────────────────────────────────────────────────────────────────────
 
-_lock = threading.Lock()
-
 def get_token() -> str:
-    try:
-        with _lock:
-            # Use cached token
-            if _token_cache["token"] and time.time() < _token_cache["expires_at"] - 60:
-                return _token_cache["token"]
-            try:
-                # ✅ Cloud Run / GCP way
-                creds, _ = default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
-                logger.info("Using default credentials (Cloud Run)")
-            except Exception:
-                # ✅ Local fallback
-                logger.info("Using service account file (local)")
-                creds = service_account.Credentials.from_service_account_file(
-                    os.getenv("APIGEE_SA_KEY_PATH", "service-account.json"),
-                    scopes=["https://www.googleapis.com/auth/cloud-platform"]
-                )
-            creds.refresh(Request())
-            _token_cache["token"] = creds.token
-            _token_cache["expires_at"] = creds.expiry.timestamp()
-            return creds.token
-    except Exception as e:
-        logger.error(f"Token generation failed: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to generate token")
+    with _lock:
+        if _token_cache["token"] and time.time() < _token_cache["expires_at"] - 60:
+            return _token_cache["token"]
+        try:
+            # Cloud Run — use attached service account automatically
+            creds, _ = default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+            logger.info("Using GCP default credentials (Cloud Run)")
+        except Exception:
+            # Local — use service account JSON file
+            logger.info("Using service account file (local)")
+            creds = service_account.Credentials.from_service_account_info(
+                _sa_info["data"],
+                scopes=["https://www.googleapis.com/auth/cloud-platform"]
+            )
+        creds.refresh(Request())
+        _token_cache["token"] = creds.token
+        _token_cache["expires_at"] = time.time() + 3600
+        logger.info("Google OAuth2 token refreshed")
+        return creds.token
+
+def headers(token: str):
+    return {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+
+def auth_only(token: str):
+    return {"Authorization": f"Bearer {token}"}
 
 # ─── INPUT VALIDATION ────────────────────────────────────────────────────────
 
@@ -179,16 +178,13 @@ async def upload_service_account(file: UploadFile = File(...)):
     try:
         content = await file.read()
         sa_data = json.loads(content)
-        # Validate it looks like a service account file
         required_keys = ["type", "project_id", "private_key", "client_email"]
         for key in required_keys:
             if key not in sa_data:
                 raise HTTPException(status_code=400, detail=f"Invalid service account file — missing '{key}'")
         if sa_data.get("type") != "service_account":
             raise HTTPException(status_code=400, detail="File is not a service account JSON")
-        # Store in memory
         _sa_info["data"] = sa_data
-        # Reset token cache so new credentials are used
         _token_cache["token"] = None
         _token_cache["expires_at"] = 0
         logger.info("Service account uploaded: %s", sanitize_log(sa_data.get("client_email", "")))

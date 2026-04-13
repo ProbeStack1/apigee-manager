@@ -7,4 +7,10 @@ __pycache__/
 .gitignore
 *.zip
 *.ps1
+*.tar
 Shared flows/
+KVM/
+Framework SF/
+tests/
+test_api.py
+apigee_manager.py

@@ -3,9 +3,11 @@ service-account.json
 *.json
 .env
 
+# Python
+__pycache__/
 *.pyc
 *.pyo
-.env
+*.pyd
 
 # Docker
 *.tar
@@ -15,3 +17,4 @@ service-account.json
 *.ps1
 Shared flows/
 KVM/
+Framework SF/

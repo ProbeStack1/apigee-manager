@@ -11,10 +11,11 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
-COPY apigee_manager.py .
+COPY main.py .
+COPY app/ app/
 
 # Expose port
 EXPOSE 8080
 
 # Run the app — PORT env var used by Cloud Run, defaults to 8080
-CMD ["uvicorn", "apigee_manager:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]

@@ -1,5 +1,6 @@
 # Secrets - NEVER push to GitHub
 service-account.json
+key.json
 *.json
 .env
 

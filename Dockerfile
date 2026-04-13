@@ -13,10 +13,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY main.py .
 COPY app/ app/
-COPY key.json .
-
-# Set env var so app knows where to find the key
-ENV APIGEE_SA_KEY_PATH=/app/key.json
 
 # Expose port
 EXPOSE 8080

@@ -35,11 +35,11 @@ jobs:
       - name: Lint check
         run: |
           pip install flake8
-          flake8 apigee_manager.py --max-line-length=120
+          flake8 app/ main.py --max-line-length=120
         continue-on-error: true
 
       - name: Verify app loads
-        run: python -c "from apigee_manager import app; print('App loaded OK')"
+        run: python -c "from main import app; print('App loaded OK')"
 
   deploy:
     needs: build-and-test

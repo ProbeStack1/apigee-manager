@@ -1,5 +1,6 @@
 import json
 import time
+import base64
 import threading
 from fastapi import HTTPException
 from google.oauth2 import service_account
@@ -14,7 +15,16 @@ _token_cache = {"token": None, "expires_at": 0}
 _lock = threading.Lock()
 
 # Auto-load service account on startup
-if SA_KEY_ENV:
+SA_KEY_B64 = os.environ.get("APIGEE_SA_KEY_B64")
+
+if SA_KEY_B64:
+    try:
+        decoded = base64.b64decode(SA_KEY_B64).decode('utf-8')
+        _sa_info["data"] = json.loads(decoded)
+        logger.info("Loaded service account from base64 env variable")
+    except Exception as e:
+        logger.error("Failed to decode APIGEE_SA_KEY_B64: %s", str(e))
+elif SA_KEY_ENV:
     try:
         _sa_info["data"] = json.loads(SA_KEY_ENV)
         logger.info("Loaded service account from environment variable")

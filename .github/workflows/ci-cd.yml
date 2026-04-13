@@ -94,7 +94,7 @@ jobs:
           --timeout=300 \
           --concurrency=80 \
           --service-account=github-actions-deployer@probestack-prod.iam.gserviceaccount.com \
-          --set-env-vars="PYTHONUNBUFFERED=1,APIGEE_SA_KEY=${{ secrets.APIGEE_SA_KEY }}" \
+          --set-env-vars="PYTHONUNBUFFERED=1,APIGEE_SA_KEY_B64=${{ secrets.APIGEE_SA_KEY_B64 }}" \
           --quiet
 
       - name: Get Service URL
